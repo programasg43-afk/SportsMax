@@ -58,6 +58,10 @@ public partial class PipWindow : Window
 
                 await AdBlocker.ApplyAsync(WebPlayer);
 
+                // Autoplay suave SOLO en el PiP: el flotante debe continuar lo que
+                // ya estabas viendo. Sin clicks sinteticos (esos causaban el toggle
+                // play/pause que rompia la carga); solo APIs de player + video.play().
+                WebPlayer.CoreWebView2.NavigationCompleted += PipNavCompleted;
                 WebPlayer.CoreWebView2.Navigate(_url);
             }
             catch (Exception ex)
@@ -88,6 +92,27 @@ public partial class PipWindow : Window
         }
 
         StartAutoHide();
+    }
+
+    private async void PipNavCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+    {
+        // Reintenta arrancar la reproduccion via API del player (sin clicks).
+        const string js = @"
+            (function(){
+              var tries = 0;
+              function go(){
+                try {
+                  try { if(window.player && window.player.play){ if(!window.player.isPlaying || !window.player.isPlaying()) window.player.play(); } } catch(e){}
+                  try { if(window.jwplayer){ var jw=window.jwplayer(); if(jw && jw.play) jw.play(true); } } catch(e){}
+                  try { if(window.videojs && window.videojs.getAllPlayers){ window.videojs.getAllPlayers().forEach(function(p){ try{p.play();}catch(e){} }); } } catch(e){}
+                  document.querySelectorAll('video').forEach(function(v){ try { v.autoplay = true; v.play && v.play().catch(function(){}); } catch(e){} });
+                } catch(e){}
+                tries++;
+                if (tries < 6) setTimeout(go, 700);
+              }
+              setTimeout(go, 200);
+            })();";
+        try { await WebPlayer.CoreWebView2.ExecuteScriptAsync(js); } catch { /* ignore */ }
     }
 
     // -- Auto-hide --
