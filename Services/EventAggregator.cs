@@ -83,7 +83,7 @@ public class EventAggregator
                 {
                     existing.Links.Add(new StreamLink
                     {
-                        Name = $"{link.Name} ({ev.Source})",
+                        Name = link.Name,
                         Url = link.Url
                     });
                 }

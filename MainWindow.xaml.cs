@@ -212,10 +212,9 @@ public partial class MainWindow : Window
         StatusBar.Text = "Cargando eventos...";
         RefreshBtn.IsEnabled = false;
 
-        var progress = new Progress<(string source, int count, bool error)>(p =>
+        var progress = new Progress<(string source, int count, bool error)>(_ =>
         {
-            var status = p.error ? "ERROR" : $"{p.count}";
-            StatusBar.Text = $"[{p.source}] {status} eventos";
+            StatusBar.Text = "Cargando agenda de eventos...";
         });
 
         try
@@ -380,8 +379,8 @@ public partial class MainWindow : Window
             MaxHeight = 38, TextTrimming = TextTrimming.CharacterEllipsis
         });
         var meta = string.IsNullOrEmpty(ev.Language)
-            ? $"{ev.Links.Count} canal(es) · {ev.Source}"
-            : $"{ev.Links.Count} canal(es) · {ev.Language} · {ev.Source}";
+            ? $"{ev.Links.Count} canal(es)"
+            : $"{ev.Links.Count} canal(es) · {ev.Language}";
         info.Children.Add(new TextBlock
         {
             Text = meta,
@@ -432,7 +431,7 @@ public partial class MainWindow : Window
     {
         _currentEvent = ev;
         PlayerTitle.Text = ev.Title;
-        PlayerMeta.Text = $"{ev.DisplayCategory} · {ev.DisplayTime} · {ev.Source}";
+        PlayerMeta.Text = $"{ev.DisplayCategory} · {ev.DisplayTime}";
 
         BuildChannelButtons(ev);
 
@@ -444,16 +443,22 @@ public partial class MainWindow : Window
         ChannelButtonsPanel.Children.Clear();
         _activeChannelBtn = null;
 
+        var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (int i = 0; i < ev.Links.Count; i++)
         {
             var link = ev.Links[i];
+            var name = string.IsNullOrWhiteSpace(link.Name) ? $"Canal {i + 1}" : link.Name.Trim();
+            // Evita botones con nombre identico (antes se distinguian por la fuente)
+            if (seen.TryGetValue(name, out var c)) { seen[name] = c + 1; name = $"{name} {c + 1}"; }
+            else seen[name] = 1;
+
             var btn = new Button
             {
-                Content = string.IsNullOrWhiteSpace(link.Name) ? $"Canal {i + 1}" : link.Name,
+                Content = name,
                 Style = (Style)FindResource("ChannelBtn"),
                 Margin = new Thickness(0, 0, 6, 6),
                 CommandParameter = link.Url,   // URL aqui (Tag se usa para marcar el activo)
-                ToolTip = link.Url
+                ToolTip = "Reproducir " + name
             };
             btn.Click += ChannelButton_Click;
             ChannelButtonsPanel.Children.Add(btn);
@@ -588,6 +593,8 @@ public partial class MainWindow : Window
         // Sin autoplay forzado: la pagina queda lista; el usuario pulsa play si no inicia sola
         PlayerStateLabel.Text = "Canal cargado · pulsa ▶ si no inicia";
         PlayerStateLabel.Foreground = (Brush)FindResource("AccentSoft");
+        // Sincroniza el volumen actual del slider con el video recien cargado
+        ApplyWebVolume((int)VolumeSlider.Value);
     }
 
     private void StopAllPlayback()
@@ -817,9 +824,24 @@ public partial class MainWindow : Window
 
     private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (_player != null) _player.Volume = (int)e.NewValue;
-        if (!_isMuted) _lastVolume = (int)e.NewValue;
-        MuteIcon.Text = (int)e.NewValue == 0 || _isMuted ? "🔇" : "🔊";
+        var vol = (int)e.NewValue;
+        if (_player != null) _player.Volume = vol;   // VLC
+        ApplyWebVolume(vol);                          // WebView2
+        if (!_isMuted) _lastVolume = vol;
+        MuteIcon.Text = (vol == 0 || _isMuted) ? "🔇" : "🔊";
+    }
+
+    private async void ApplyWebVolume(int vol)
+    {
+        if (!_webReady || WebPlayer.CoreWebView2 == null) return;
+        try
+        {
+            var v = Math.Clamp(vol, 0, 100) / 100.0;
+            var js = "window.__smSetVolume && window.__smSetVolume(" +
+                     v.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
+            await WebPlayer.CoreWebView2.ExecuteScriptAsync(js);
+        }
+        catch { /* ignore */ }
     }
 
     private void MuteIcon_Click(object sender, MouseButtonEventArgs e)

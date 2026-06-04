@@ -97,6 +97,28 @@ public static class AdBlocker
       };
     } catch(e){}
 
+    // ============== CONTROL DE VOLUMEN ==============
+    try {
+      if (typeof window.__smVol !== 'number') window.__smVol = 0.8;
+      window.__smApplyVol = function(){
+        try {
+          document.querySelectorAll('video, audio').forEach(function(m){
+            try { m.volume = window.__smVol; m.muted = (window.__smVol === 0); } catch(e){}
+          });
+        } catch(e){}
+      };
+      window.__smSetVolume = function(v){
+        try {
+          v = Number(v);
+          if (isNaN(v)) return;
+          window.__smVol = Math.max(0, Math.min(1, v));
+          window.__smApplyVol();
+        } catch(e){}
+      };
+      // Reaplica el volumen a videos que aparezcan despues (no reinicia la reproduccion)
+      setInterval(window.__smApplyVol, 1200);
+    } catch(e){}
+
     // ============== OCULTAR ADS ==============
     function hideAds(){
       try {
