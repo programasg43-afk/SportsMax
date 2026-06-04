@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private Engine _engine = Engine.Auto;
     private string? _lastPlayedUrl;
     private Button? _activeChannelBtn;
+    private Border? _activeEventCard;
 
     private PipWindow? _pip;
 
@@ -313,6 +314,7 @@ public partial class MainWindow : Window
     private void RenderEvents(List<SportEvent> events)
     {
         EventsPanel.Children.Clear();
+        _activeEventCard = null;   // se reasigna en BuildEventCard si el evento activo sigue visible
 
         if (events.Count == 0)
         {
@@ -335,15 +337,20 @@ public partial class MainWindow : Window
     {
         var card = new Border
         {
-            Background = (Brush)FindResource("BgCard"),
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(10, 8, 10, 8),
             Margin = new Thickness(0, 0, 0, 6),
+            BorderThickness = new Thickness(2),
             Cursor = Cursors.Hand,
             Tag = ev
         };
 
-        card.MouseLeftButtonUp += (_, __) => SelectEvent(ev);
+        // Resalta la tarjeta si corresponde al evento seleccionado
+        var isActive = _currentEvent != null && ReferenceEquals(ev, _currentEvent);
+        ApplyEventCardStyle(card, isActive);
+        if (isActive) _activeEventCard = card;
+
+        card.MouseLeftButtonUp += (_, __) => { SetActiveEventCard(card); SelectEvent(ev); };
 
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(54) });
@@ -423,6 +430,30 @@ public partial class MainWindow : Window
 
         card.Child = grid;
         return card;
+    }
+
+    private void ApplyEventCardStyle(Border card, bool active)
+    {
+        // Grosor de borde constante (2) para que no salte el layout; solo cambia el color
+        card.BorderThickness = new Thickness(2);
+        if (active)
+        {
+            card.Background = (Brush)FindResource("BgCardAlt");
+            card.BorderBrush = (Brush)FindResource("Accent");
+        }
+        else
+        {
+            card.Background = (Brush)FindResource("BgCard");
+            card.BorderBrush = System.Windows.Media.Brushes.Transparent;
+        }
+    }
+
+    private void SetActiveEventCard(Border card)
+    {
+        if (_activeEventCard != null && !ReferenceEquals(_activeEventCard, card))
+            ApplyEventCardStyle(_activeEventCard, false);
+        ApplyEventCardStyle(card, true);
+        _activeEventCard = card;
     }
 
     // =================== SELECCION / PLAYER ===================
