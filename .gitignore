@@ -1,0 +1,30 @@
+# ---- .NET build output ----
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+publish/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ---- Visual Studio / Rider ----
+.vs/
+.idea/
+*.csproj.user
+
+# ---- Instalador ----
+installer/Output/
+installer/redist/
+
+# ---- WebView2 / runtime user data (por si llegara a quedar en el repo) ----
+WebView2/
+WebView2Pip/
+
+# ---- Logs locales ----
+*.log
+
+# ---- Misc ----
+*.tmp
+Thumbs.db
+.DS_Store

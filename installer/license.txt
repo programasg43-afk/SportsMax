@@ -1,0 +1,67 @@
+﻿SPORTSMAX - TERMINOS DE USO, AVISO LEGAL Y PRIVACIDAD
+=====================================================
+
+Lea este aviso antes de instalar. Al pulsar "Acepto" y continuar con la
+instalacion, usted declara haber leido y aceptado los siguientes terminos.
+
+
+1. NATURALEZA DE LA APLICACION
+------------------------------
+SportsMax es un AGREGADOR y REPRODUCTOR de una agenda publica de eventos
+deportivos. La aplicacion NO aloja, NO produce, NO almacena y NO distribuye
+ningun contenido audiovisual. Unicamente muestra una lista de eventos obtenida
+de fuentes publicas de terceros y abre enlaces de terceros que usted elige
+reproducir.
+
+
+2. CONTENIDO DE TERCEROS - RESPONSABILIDAD DEL USUARIO
+------------------------------------------------------
+Los desarrolladores de SportsMax NO tienen control sobre la disponibilidad, la
+legalidad, la exactitud ni las licencias del contenido al que apuntan los
+enlaces de terceros. El acceso y uso de dicho contenido es responsabilidad
+EXCLUSIVA del usuario final, quien debe cumplir las leyes de su pais y los
+terminos de los titulares de los derechos. Si un contenido infringe derechos en
+su jurisdiccion, absténgase de utilizarlo.
+
+
+3. PRIVACIDAD (RESUMEN)
+-----------------------
+- SportsMax NO recopila datos personales.
+- SportsMax NO incluye telemetria, analitica ni publicidad propia.
+- Toda la informacion generada (registros y cache del navegador embebido)
+  permanece en su equipo, en la carpeta:
+      %LOCALAPPDATA%\SportsMax
+  y nunca se envia a los desarrolladores.
+- La aplicacion se conecta a Internet solo para descargar la agenda de eventos
+  y para reproducir el canal que usted seleccione (fuentes y CDNs de terceros).
+- Incluye un bloqueador de ventanas emergentes y de redes publicitarias.
+
+La politica de privacidad completa esta disponible en el archivo PRIVACY.md y
+se instala junto a la aplicacion.
+
+
+4. COMPONENTES DE TERCEROS
+--------------------------
+SportsMax utiliza componentes de terceros bajo sus respectivas licencias:
+- VideoLAN / libVLC (LGPL) para la reproduccion de video.
+- Microsoft Edge WebView2 para la reproduccion de paginas web de canales.
+- LibVLCSharp.
+
+Microsoft WebView2 se rige por la Declaracion de Privacidad de Microsoft.
+
+
+5. SIN GARANTIA
+---------------
+EL SOFTWARE SE PROPORCIONA "TAL CUAL", SIN GARANTIA DE NINGUN TIPO, EXPRESA O
+IMPLICITA. LOS DESARROLLADORES NO SERAN RESPONSABLES DE NINGUN DANO DERIVADO DEL
+USO O LA IMPOSIBILIDAD DE USO DEL SOFTWARE NI DEL CONTENIDO DE TERCEROS.
+
+
+6. EDAD
+-------
+El contenido de terceros puede no ser apropiado para todas las edades. Se
+recomienda supervision de un adulto para menores.
+
+
+Si NO esta de acuerdo con estos terminos, pulse "Cancelar" y no instale el
+software.

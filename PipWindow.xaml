@@ -1,0 +1,53 @@
+<Window x:Class="SportsMax.PipWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="SportsMax PiP"
+        WindowStyle="None"
+        Topmost="True"
+        AllowsTransparency="False"
+        Background="Black"
+        Width="480" Height="300"
+        MinWidth="280" MinHeight="180"
+        WindowStartupLocation="Manual"
+        ShowInTaskbar="False"
+        ResizeMode="CanResizeWithGrip">
+    <!-- Borde azul SportsMax -->
+    <Border BorderBrush="#FF1E88E5" BorderThickness="2" Background="Black">
+        <!-- DockPanel: header EN SU PROPIA FILA (sin overlap con el video) para evitar airspace -->
+        <DockPanel LastChildFill="True">
+            <Border x:Name="HeaderBar" DockPanel.Dock="Top" Background="#FF1A2640" Height="30"
+                    MouseLeftButtonDown="Drag_MouseDown"
+                    Cursor="SizeAll">
+                <DockPanel LastChildFill="True">
+                    <Button DockPanel.Dock="Right" Content="✕"
+                            Width="32" Height="30"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="White" FontSize="14"
+                            Cursor="Hand" Click="Close_Click"
+                            ToolTip="Cerrar"/>
+                    <Button DockPanel.Dock="Right" Content="🗗"
+                            Width="32" Height="30"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="White" FontSize="13"
+                            Cursor="Hand" Click="Return_Click"
+                            ToolTip="Volver a la ventana principal"/>
+                    <TextBlock x:Name="TitleLabel"
+                               Text="SportsMax PiP" FontSize="11"
+                               Foreground="White" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Margin="10,0,0,0"/>
+                </DockPanel>
+            </Border>
+
+            <!-- Area del player (debajo del header, sin overlap) -->
+            <Grid x:Name="PlayerArea">
+                <vlc:VideoView x:Name="VideoView" Background="Black" Visibility="Visible"/>
+                <wv2:WebView2 x:Name="WebPlayer"
+                              DefaultBackgroundColor="Black"
+                              Visibility="Collapsed"/>
+            </Grid>
+        </DockPanel>
+    </Border>
+</Window>

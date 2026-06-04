@@ -1,0 +1,246 @@
+<Window x:Class="SportsMax.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vlc="clr-namespace:LibVLCSharp.WPF;assembly=LibVLCSharp.WPF"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="SportsMax - Agenda Deportiva en Vivo"
+        Width="1280" Height="780"
+        MinWidth="1024" MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource BgDark}"
+        Foreground="{StaticResource FgPrimary}"
+        KeyDown="Window_KeyDown">
+
+    <DockPanel>
+
+        <!-- Status bar -->
+        <Border x:Name="StatusBarBorder" DockPanel.Dock="Bottom" Background="{StaticResource BgPanel}" Height="26">
+            <DockPanel>
+                <TextBlock x:Name="StatusBar" DockPanel.Dock="Left"
+                           Text="Listo" FontSize="11"
+                           Foreground="{StaticResource FgMuted}"
+                           VerticalAlignment="Center" Margin="10,0"/>
+                <TextBlock DockPanel.Dock="Right" Text="SportsMax v1.0"
+                           FontSize="10" Foreground="{StaticResource FgMuted}"
+                           VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <TextBlock/>
+            </DockPanel>
+        </Border>
+
+        <!-- Header con logo + branding -->
+        <Border x:Name="HeaderBorder" DockPanel.Dock="Top" Background="{StaticResource BgPanel}" Padding="14,10">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Image Source="pack://application:,,,/Assets/logo.png"
+                           Width="44" Height="44" Margin="0,0,12,0"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="SPORTSMAX" FontSize="22" FontWeight="Bold"
+                                   Foreground="{StaticResource FgPrimary}"/>
+                        <TextBlock Text="Agenda deportiva en vivo · multifuente"
+                                   FontSize="11" Foreground="{StaticResource AccentSoft}"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="ClockLabel" Text="--:--:--"
+                               FontSize="14" FontWeight="SemiBold"
+                               Foreground="{StaticResource FgPrimary}"
+                               VerticalAlignment="Center" Margin="0,0,16,0"/>
+                    <Button x:Name="RefreshBtn" Content="↻ Actualizar"
+                            Width="110" Height="30"
+                            Style="{StaticResource BtnBase}"
+                            Click="RefreshBtn_Click"/>
+                </StackPanel>
+                <Border/>
+            </DockPanel>
+        </Border>
+
+        <!-- Barra para salir de fullscreen (solo visible en fullscreen, fuera del area de video) -->
+        <Border x:Name="FsExitBar" DockPanel.Dock="Top"
+                Background="#CC0B1320" Padding="10,4"
+                Visibility="Collapsed">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="✕ Salir pantalla completa (Esc)"
+                        Width="240" Height="28"
+                        Style="{StaticResource BtnGhost}"
+                        Click="FullscreenBtn_Click"/>
+                <TextBlock Text="Pantalla completa · presiona Esc o el boton para salir"
+                           Foreground="{StaticResource FgSecondary}" FontSize="11"
+                           VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Grid principal: lista | reproductor -->
+        <Grid x:Name="MainGrid" Margin="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="SidebarCol" Width="420" MinWidth="320"/>
+                <ColumnDefinition x:Name="SplitterCol" Width="6"/>
+                <ColumnDefinition x:Name="PlayerCol" Width="*" MinWidth="500"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ==== COLUMNA IZQUIERDA: eventos ==== -->
+            <Border x:Name="SidebarBorder" Grid.Column="0" Background="{StaticResource BgPanel}" CornerRadius="8">
+                <DockPanel Margin="10">
+
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <TextBlock Text="Eventos del dia" FontSize="14" FontWeight="SemiBold"
+                                   Foreground="{StaticResource FgPrimary}" Margin="0,0,0,8"/>
+                        <TextBox x:Name="SearchBox" Style="{StaticResource SearchBox}"
+                                 Height="30"
+                                 TextChanged="SearchBox_TextChanged"
+                                 Tag="🔍  Buscar equipo, liga, canal..."/>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="6"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox Grid.Column="0" x:Name="CategoryCombo"
+                                      Style="{StaticResource ComboDark}" Height="28"
+                                      SelectionChanged="Filter_Changed"/>
+                            <ComboBox Grid.Column="2" x:Name="StatusCombo"
+                                      Style="{StaticResource ComboDark}" Height="28"
+                                      SelectionChanged="Filter_Changed"/>
+                        </Grid>
+                    </StackPanel>
+
+                    <Border DockPanel.Dock="Top" Background="{StaticResource BgCard}"
+                            CornerRadius="6" Padding="10,8" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                                <TextBlock x:Name="TotalCount" Text="0" FontSize="18" FontWeight="Bold"
+                                           Foreground="{StaticResource AccentSoft}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Total" FontSize="10"
+                                           Foreground="{StaticResource FgMuted}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                                <TextBlock x:Name="LiveCount" Text="0" FontSize="18" FontWeight="Bold"
+                                           Foreground="{StaticResource LiveRed}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="EN VIVO" FontSize="10"
+                                           Foreground="{StaticResource FgMuted}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                <TextBlock x:Name="SoonCount" Text="0" FontSize="18" FontWeight="Bold"
+                                           Foreground="{StaticResource SoonOrange}" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Pronto" FontSize="10"
+                                           Foreground="{StaticResource FgMuted}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="EventsPanel"/>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <GridSplitter x:Name="SplitterCtl" Grid.Column="1" Width="6"
+                          Background="{StaticResource Divider}"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"/>
+
+            <!-- ==== COLUMNA DERECHA: reproductor ==== -->
+            <Border x:Name="PlayerOuterBorder" Grid.Column="2" Background="{StaticResource BgPanel}" CornerRadius="8">
+                <DockPanel x:Name="PlayerInnerDock" Margin="10">
+
+                    <!-- Cabecera del player -->
+                    <Border x:Name="PlayerHeader" DockPanel.Dock="Top" Background="{StaticResource BgCard}"
+                            CornerRadius="6" Padding="12,10" Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock x:Name="PlayerTitle" Text="Selecciona un evento"
+                                       FontSize="15" FontWeight="SemiBold"
+                                       Foreground="{StaticResource FgPrimary}"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="PlayerMeta" Text="Sin transmision activa"
+                                       FontSize="11" Foreground="{StaticResource FgMuted}"
+                                       Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Selector de canales (botones) + motor -->
+                    <Border x:Name="ChannelBar" DockPanel.Dock="Top" Background="{StaticResource BgCard}"
+                            CornerRadius="6" Padding="10,8" Margin="0,0,0,8">
+                        <DockPanel>
+                            <!-- Fila superior: titulo + motor -->
+                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="Motor: " FontSize="12"
+                                               Foreground="{StaticResource FgSecondary}"
+                                               VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                    <ComboBox x:Name="EngineCombo" Style="{StaticResource ComboDark}"
+                                              Width="130" Height="28"
+                                              SelectionChanged="EngineCombo_SelectionChanged"/>
+                                </StackPanel>
+                                <TextBlock Text="Canales disponibles:" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{StaticResource AccentSoft}"
+                                           VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <!-- Botones de canal (wrap a varias filas) -->
+                            <WrapPanel x:Name="ChannelButtonsPanel" Orientation="Horizontal"/>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Controles inferiores -->
+                    <Border x:Name="ControlBar" DockPanel.Dock="Bottom" Background="{StaticResource BgCard}"
+                            CornerRadius="6" Padding="10,8" Margin="0,8,0,0">
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock x:Name="MuteIcon" Text="🔊" FontSize="14"
+                                           VerticalAlignment="Center" Margin="0,0,6,0"
+                                           Cursor="Hand" MouseLeftButtonUp="MuteIcon_Click"/>
+                                <Slider x:Name="VolumeSlider" Width="100"
+                                        Minimum="0" Maximum="100" Value="80"
+                                        VerticalAlignment="Center"
+                                        ValueChanged="VolumeSlider_ValueChanged"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Button x:Name="StopBtn" Content="■ Detener" Width="90" Height="30"
+                                        Style="{StaticResource BtnRed}" Margin="0,0,6,0"
+                                        Click="StopBtn_Click"/>
+                                <Button x:Name="FullscreenBtn" Content="⛶ Pantalla completa"
+                                        Width="160" Height="30"
+                                        Style="{StaticResource BtnGhost}" Margin="0,0,6,0"
+                                        Click="FullscreenBtn_Click"
+                                        ToolTip="Pantalla completa (F11 o Esc para salir)"/>
+                                <Button x:Name="PipBtn" Content="🖼 Flotante"
+                                        Width="110" Height="30"
+                                        Style="{StaticResource BtnGhost}"
+                                        Click="PipBtn_Click"
+                                        ToolTip="Ventana flotante sobre otras aplicaciones"/>
+                                <TextBlock x:Name="PlayerStateLabel" Text=""
+                                           FontSize="11" Foreground="{StaticResource FgMuted}"
+                                           VerticalAlignment="Center" Margin="12,0,0,0"/>
+                            </StackPanel>
+                            <Border/>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Superficie de video: VLC y WebView2 apilados -->
+                    <Grid x:Name="VideoContainer">
+                        <Border x:Name="VideoSurfaceBorder" Background="Black" CornerRadius="6" ClipToBounds="True">
+                            <Grid>
+                                <vlc:VideoView x:Name="VideoView" Background="Black"
+                                               Visibility="Visible"/>
+                                <wv2:WebView2 x:Name="WebPlayer"
+                                              DefaultBackgroundColor="Black"
+                                              Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+                        <Image x:Name="PosterImage"
+                               Source="pack://application:,,,/Assets/logo.png"
+                               Width="180" Height="180" Opacity="0.35"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsHitTestVisible="False"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
+                    </Grid>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

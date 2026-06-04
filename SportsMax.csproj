@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>SportsMax</RootNamespace>
+    <AssemblyName>SportsMax</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\icono.ico</ApplicationIcon>
+    <Version>1.0.0.0</Version>
+    <Product>SportsMax</Product>
+    <Company>SportsMax</Company>
+    <Description>Reproductor de eventos deportivos en vivo</Description>
+    <!-- Solo recursos en ingles/espanol base: evita ~15 MB de DLLs satelite -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LibVLCSharp.WPF" Version="3.9.0" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.20" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\logo.png" />
+    <Resource Include="Assets\icono.ico" />
+  </ItemGroup>
+
+  <!--
+    Adelgaza el publish: en builds x64 elimina el libvlc de x86 (duplicado) y los
+    plugins de interfaz grafica de VLC (no usados, renderizamos en VideoView).
+    Reduce el tamano del instalador en ~145 MB.
+  -->
+  <Target Name="TrimLibVlc" AfterTargets="Publish">
+    <ItemGroup>
+      <_VlcX86 Include="$(PublishDir)libvlc\win-x86\**\*" />
+      <_VlcGui Include="$(PublishDir)libvlc\win-x64\plugins\gui\**\*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(PublishDir)libvlc\win-x86" Condition="Exists('$(PublishDir)libvlc\win-x86')" />
+    <RemoveDir Directories="$(PublishDir)libvlc\win-x64\plugins\gui" Condition="Exists('$(PublishDir)libvlc\win-x64\plugins\gui')" />
+    <Message Importance="high" Text="[SportsMax] libvlc adelgazado (x86 y plugins gui eliminados)." />
+  </Target>
+
+</Project>
