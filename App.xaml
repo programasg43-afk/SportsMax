@@ -67,9 +67,10 @@
                 <Setter Property="Background" Value="{StaticResource BgCardAlt}"/>
                 <Setter Property="Foreground" Value="White"/>
                 <Setter Property="CaretBrush" Value="White"/>
+                <Setter Property="SelectionBrush" Value="{StaticResource Accent}"/>
                 <Setter Property="BorderBrush" Value="{StaticResource Divider}"/>
                 <Setter Property="BorderThickness" Value="1"/>
-                <Setter Property="Padding" Value="8,6"/>
+                <Setter Property="Padding" Value="10,0"/>
                 <Setter Property="FontSize" Value="12"/>
                 <Setter Property="VerticalContentAlignment" Value="Center"/>
                 <Setter Property="Template">
@@ -78,24 +79,34 @@
                             <Border Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}"
                                     BorderThickness="{TemplateBinding BorderThickness}"
-                                    CornerRadius="4">
+                                    CornerRadius="4"
+                                    Padding="{TemplateBinding Padding}">
                                 <Grid>
                                     <TextBlock x:Name="Placeholder"
                                                Text="{TemplateBinding Tag}"
                                                Foreground="{StaticResource FgMuted}"
                                                VerticalAlignment="Center"
-                                               Margin="{TemplateBinding Padding}"
+                                               HorizontalAlignment="Left"
                                                IsHitTestVisible="False"
                                                Visibility="Collapsed"/>
                                     <ScrollViewer x:Name="PART_ContentHost"
-                                                  Margin="{TemplateBinding Padding}"
+                                                  Focusable="False"
+                                                  VerticalAlignment="Center"
+                                                  HorizontalScrollBarVisibility="Hidden"
+                                                  VerticalScrollBarVisibility="Hidden"
                                                   Background="Transparent"/>
                                 </Grid>
                             </Border>
                             <ControlTemplate.Triggers>
-                                <Trigger Property="Text" Value="">
+                                <!-- Placeholder gris solo cuando el campo esta vacio y sin foco;
+                                     al escribir desaparece y se ve el texto blanco. -->
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="Text" Value=""/>
+                                        <Condition Property="IsKeyboardFocused" Value="False"/>
+                                    </MultiTrigger.Conditions>
                                     <Setter TargetName="Placeholder" Property="Visibility" Value="Visible"/>
-                                </Trigger>
+                                </MultiTrigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Setter.Value>

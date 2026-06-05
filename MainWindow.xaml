@@ -71,6 +71,28 @@
             </DockPanel>
         </Border>
 
+        <!-- Barra del modo flotante: franja propia ARRIBA (fuera del area del
+             WebView2/VLC, que es airspace y taparia cualquier overlay con sus clics) -->
+        <Border x:Name="PipBar" DockPanel.Dock="Top"
+                Background="#F00B1320" Padding="8,4"
+                Visibility="Collapsed">
+            <DockPanel LastChildFill="False">
+                <TextBlock DockPanel.Dock="Left" Text="≡  SportsMax · arrastra aqui"
+                           FontSize="11" Foreground="{StaticResource FgSecondary}"
+                           VerticalAlignment="Center" Cursor="SizeAll"
+                           MouseLeftButtonDown="PipBar_MouseLeftButtonDown"
+                           ToolTip="Arrastra para mover la ventana flotante"/>
+                <Button DockPanel.Dock="Right" Content="✕" Width="30" Height="24"
+                        Padding="0" FontSize="13"
+                        Style="{StaticResource BtnRed}"
+                        Click="PipStop_Click" ToolTip="Detener y restaurar"/>
+                <Button DockPanel.Dock="Right" Content="⤢ Restaurar" Height="24"
+                        Padding="12,0" Margin="0,0,6,0"
+                        Style="{StaticResource BtnGhost}"
+                        Click="PipRestore_Click" ToolTip="Volver a la ventana normal (Esc)"/>
+            </DockPanel>
+        </Border>
+
         <!-- Grid principal: lista | reproductor -->
         <Grid x:Name="MainGrid" Margin="10">
             <Grid.ColumnDefinitions>
@@ -190,15 +212,6 @@
                     <Border x:Name="ControlBar" DockPanel.Dock="Bottom" Background="{StaticResource BgCard}"
                             CornerRadius="6" Padding="10,8" Margin="0,8,0,0">
                         <DockPanel>
-                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock x:Name="MuteIcon" Text="🔊" FontSize="14"
-                                           VerticalAlignment="Center" Margin="0,0,6,0"
-                                           Cursor="Hand" MouseLeftButtonUp="MuteIcon_Click"/>
-                                <Slider x:Name="VolumeSlider" Width="100"
-                                        Minimum="0" Maximum="100" Value="80"
-                                        VerticalAlignment="Center"
-                                        ValueChanged="VolumeSlider_ValueChanged"/>
-                            </StackPanel>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <Button x:Name="StopBtn" Content="■ Detener" Width="90" Height="30"
                                         Style="{StaticResource BtnRed}" Margin="0,0,6,0"

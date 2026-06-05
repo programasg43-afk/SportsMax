@@ -47,6 +47,7 @@ public static class AdBlocker
         "luckyads.pro", "ero-advertising.com",
         "tsyndicate.com", "adservme.com", "videovard.com",
         "popsoul.com", "popmonster.cc",
+        "effectivecpmnetwork.com", "effectivegatecpm.com",
 
         // RTB / exchanges
         "adnxs.com", "amazon-adsystem.com", "rubiconproject.com",
@@ -97,27 +98,8 @@ public static class AdBlocker
       };
     } catch(e){}
 
-    // ============== CONTROL DE VOLUMEN ==============
-    try {
-      if (typeof window.__smVol !== 'number') window.__smVol = 0.8;
-      window.__smApplyVol = function(){
-        try {
-          document.querySelectorAll('video, audio').forEach(function(m){
-            try { m.volume = window.__smVol; m.muted = (window.__smVol === 0); } catch(e){}
-          });
-        } catch(e){}
-      };
-      window.__smSetVolume = function(v){
-        try {
-          v = Number(v);
-          if (isNaN(v)) return;
-          window.__smVol = Math.max(0, Math.min(1, v));
-          window.__smApplyVol();
-        } catch(e){}
-      };
-      // Reaplica el volumen a videos que aparezcan despues (no reinicia la reproduccion)
-      setInterval(window.__smApplyVol, 1200);
-    } catch(e){}
+    // El control de volumen lo gestiona el propio reproductor (Clappr/JW/video
+    // nativo). No inyectamos ningun forzado de volumen para no competir con el.
 
     // ============== OCULTAR ADS ==============
     function hideAds(){

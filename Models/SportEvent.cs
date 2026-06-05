@@ -8,7 +8,8 @@ public enum EventStatus
 {
     Unknown,
     Live,
-    Soon,
+    Soon,       // Inminente: faltan <= 10 min para empezar
+    Upcoming,   // Proximamente: faltan > 10 min
     Finished
 }
 
@@ -26,6 +27,8 @@ public class SportEvent
     private static readonly TimeSpan EventDuration = TimeSpan.FromHours(2.5);
     // Tiempo de gracia tras finalizar antes de ocultar
     private static readonly TimeSpan HideGrace = TimeSpan.FromHours(2.5);
+    // Umbral entre "Pronto" (inminente) y "Proximamente"
+    private static readonly TimeSpan SoonWindow = TimeSpan.FromMinutes(10);
 
     public string Title { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;
@@ -80,7 +83,8 @@ public class SportEvent
             var start = StartLocal;
             if (start == null) return EventStatus.Unknown;
             var now = DateTime.Now;
-            if (now < start.Value) return EventStatus.Soon;
+            if (now < start.Value)
+                return (start.Value - now) <= SoonWindow ? EventStatus.Soon : EventStatus.Upcoming;
             if (now < start.Value + EventDuration) return EventStatus.Live;
             return EventStatus.Finished;
         }
