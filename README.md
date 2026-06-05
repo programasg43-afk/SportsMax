@@ -93,7 +93,7 @@ dotnet run -c Release
 dotnet publish SportsMax.csproj -c Release -r win-x64 --self-contained true -o publish
 ```
 El proyecto adelgaza automáticamente el publish (elimina libVLC x86 y plugins no usados).
-<img width="1919" height="1015" alt="image" src="https://github.com/user-attachments/assets/7cd376d3-6107-4ea3-9cd3-321df29feedd" />
+
 
 ---
 
@@ -115,6 +115,7 @@ El proyecto adelgaza automáticamente el publish (elimina libVLC x86 y plugins n
    ```
 5. El instalador queda en `installer/Output/SportsMax-Setup-1.0.0.exe`.
 
+<img width="1919" height="1015" alt="image" src="https://github.com/user-attachments/assets/7cd376d3-6107-4ea3-9cd3-321df29feedd" />
 ---
 
 ## 🧩 Tecnologías
