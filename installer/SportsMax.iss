@@ -13,7 +13,7 @@
 ; ============================================================================
 
 #define MyAppName "SportsMax"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "SportsMax"
 #define MyAppExeName "SportsMax.exe"
 #define MyPublishDir "..\publish"

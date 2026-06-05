@@ -9,7 +9,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>Assets\icono.ico</ApplicationIcon>
-    <Version>1.0.0.0</Version>
+    <Version>1.1.0.0</Version>
     <Product>SportsMax</Product>
     <Company>SportsMax</Company>
     <Description>Reproductor de eventos deportivos en vivo</Description>
