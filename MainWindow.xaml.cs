@@ -28,14 +28,21 @@ public partial class MainWindow : Window
 
     private LibVLC? _libVLC;
     private LibVLCSharp.Shared.MediaPlayer? _player;
-    private bool _isMuted;
-    private int _lastVolume = 80;
     private bool _webReady;
     private Engine _engine = Engine.Auto;
     private string? _lastPlayedUrl;
     private Button? _activeChannelBtn;
+    private Border? _activeEventCard;
 
-    private PipWindow? _pip;
+    // Modo ventana flotante (PiP): reconfigura ESTA ventana en vez de abrir otra,
+    // asi el reproductor (WebView2/VLC) no se recrea y la reproduccion continua.
+    private bool _isPip;
+    private WindowStyle _savedPipWindowStyle;
+    private WindowState _savedPipWindowState;
+    private ResizeMode _savedPipResizeMode;
+    private bool _savedPipTopmost;
+    private double _savedPipLeft, _savedPipTop, _savedPipWidth, _savedPipHeight;
+    private double _savedPipMinWidth, _savedPipMinHeight;
 
     // Fullscreen state
     private bool _isFullscreen;
@@ -58,6 +65,11 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _fsPollTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private readonly DispatcherTimer _fsHideTimer = new() { Interval = TimeSpan.FromSeconds(4) };
     private POINT _lastFsCursor;
+
+    // Auto-hide de la barra del modo flotante (mismo enfoque que el de fullscreen)
+    private readonly DispatcherTimer _pipPollTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+    private readonly DispatcherTimer _pipHideTimer = new() { Interval = TimeSpan.FromSeconds(4) };
+    private POINT _lastPipCursor;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct POINT { public int X; public int Y; }
@@ -157,7 +169,6 @@ public partial class MainWindow : Window
         _player?.Dispose();
         _libVLC?.Dispose();
         try { WebPlayer?.Dispose(); } catch { /* ignore */ }
-        try { _pip?.Close(); } catch { /* ignore */ }
         _clock.Stop();
         _statusTimer.Stop();
     }
@@ -184,7 +195,8 @@ public partial class MainWindow : Window
         StatusCombo.Items.Clear();
         StatusCombo.Items.Add(new ComboBoxItem { Content = "Todos los estados", Tag = "*" });
         StatusCombo.Items.Add(new ComboBoxItem { Content = "EN VIVO",          Tag = "live" });
-        StatusCombo.Items.Add(new ComboBoxItem { Content = "Proximamente",     Tag = "soon" });
+        StatusCombo.Items.Add(new ComboBoxItem { Content = "Pronto",           Tag = "soon" });
+        StatusCombo.Items.Add(new ComboBoxItem { Content = "Proximamente",     Tag = "upcoming" });
         StatusCombo.Items.Add(new ComboBoxItem { Content = "Finalizados",      Tag = "finished" });
         StatusCombo.SelectedIndex = 0;
     }
@@ -212,10 +224,9 @@ public partial class MainWindow : Window
         StatusBar.Text = "Cargando eventos...";
         RefreshBtn.IsEnabled = false;
 
-        var progress = new Progress<(string source, int count, bool error)>(p =>
+        var progress = new Progress<(string source, int count, bool error)>(_ =>
         {
-            var status = p.error ? "ERROR" : $"{p.count}";
-            StatusBar.Text = $"[{p.source}] {status} eventos";
+            StatusBar.Text = "Cargando agenda de eventos...";
         });
 
         try
@@ -290,6 +301,7 @@ public partial class MainWindow : Window
             {
                 "live"     => view.Where(e => e.Status == EventStatus.Live),
                 "soon"     => view.Where(e => e.Status == EventStatus.Soon),
+                "upcoming" => view.Where(e => e.Status == EventStatus.Upcoming),
                 "finished" => view.Where(e => e.Status == EventStatus.Finished),
                 _ => view
             };
@@ -308,12 +320,13 @@ public partial class MainWindow : Window
 
         TotalCount.Text = list.Count.ToString();
         LiveCount.Text = list.Count(e => e.Status == EventStatus.Live).ToString();
-        SoonCount.Text = list.Count(e => e.Status == EventStatus.Soon).ToString();
+        SoonCount.Text = list.Count(e => e.Status is EventStatus.Soon or EventStatus.Upcoming).ToString();
     }
 
     private void RenderEvents(List<SportEvent> events)
     {
         EventsPanel.Children.Clear();
+        _activeEventCard = null;   // se reasigna en BuildEventCard si el evento activo sigue visible
 
         if (events.Count == 0)
         {
@@ -336,15 +349,20 @@ public partial class MainWindow : Window
     {
         var card = new Border
         {
-            Background = (Brush)FindResource("BgCard"),
             CornerRadius = new CornerRadius(8),
             Padding = new Thickness(10, 8, 10, 8),
             Margin = new Thickness(0, 0, 0, 6),
+            BorderThickness = new Thickness(2),
             Cursor = Cursors.Hand,
             Tag = ev
         };
 
-        card.MouseLeftButtonUp += (_, __) => SelectEvent(ev);
+        // Resalta la tarjeta si corresponde al evento seleccionado
+        var isActive = _currentEvent != null && ReferenceEquals(ev, _currentEvent);
+        ApplyEventCardStyle(card, isActive);
+        if (isActive) _activeEventCard = card;
+
+        card.MouseLeftButtonUp += (_, __) => { SetActiveEventCard(card); SelectEvent(ev); };
 
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(54) });
@@ -380,8 +398,8 @@ public partial class MainWindow : Window
             MaxHeight = 38, TextTrimming = TextTrimming.CharacterEllipsis
         });
         var meta = string.IsNullOrEmpty(ev.Language)
-            ? $"{ev.Links.Count} canal(es) · {ev.Source}"
-            : $"{ev.Links.Count} canal(es) · {ev.Language} · {ev.Source}";
+            ? $"{ev.Links.Count} canal(es)"
+            : $"{ev.Links.Count} canal(es) · {ev.Language}";
         info.Children.Add(new TextBlock
         {
             Text = meta,
@@ -396,6 +414,7 @@ public partial class MainWindow : Window
         {
             EventStatus.Live     => (Brush)FindResource("LiveRed"),
             EventStatus.Soon     => (Brush)FindResource("SoonOrange"),
+            EventStatus.Upcoming => (Brush)FindResource("Accent"),
             EventStatus.Finished => (Brush)FindResource("FgMuted"),
             _ => (Brush)FindResource("AccentDark")
         };
@@ -403,6 +422,7 @@ public partial class MainWindow : Window
         {
             EventStatus.Live     => "● EN VIVO",
             EventStatus.Soon     => "PRONTO",
+            EventStatus.Upcoming => "PROXIMAMENTE",
             EventStatus.Finished => "FIN",
             _ => "PROG"
         };
@@ -426,13 +446,37 @@ public partial class MainWindow : Window
         return card;
     }
 
+    private void ApplyEventCardStyle(Border card, bool active)
+    {
+        // Grosor de borde constante (2) para que no salte el layout; solo cambia el color
+        card.BorderThickness = new Thickness(2);
+        if (active)
+        {
+            card.Background = (Brush)FindResource("BgCardAlt");
+            card.BorderBrush = (Brush)FindResource("Accent");
+        }
+        else
+        {
+            card.Background = (Brush)FindResource("BgCard");
+            card.BorderBrush = System.Windows.Media.Brushes.Transparent;
+        }
+    }
+
+    private void SetActiveEventCard(Border card)
+    {
+        if (_activeEventCard != null && !ReferenceEquals(_activeEventCard, card))
+            ApplyEventCardStyle(_activeEventCard, false);
+        ApplyEventCardStyle(card, true);
+        _activeEventCard = card;
+    }
+
     // =================== SELECCION / PLAYER ===================
 
     private void SelectEvent(SportEvent ev)
     {
         _currentEvent = ev;
         PlayerTitle.Text = ev.Title;
-        PlayerMeta.Text = $"{ev.DisplayCategory} · {ev.DisplayTime} · {ev.Source}";
+        PlayerMeta.Text = $"{ev.DisplayCategory} · {ev.DisplayTime}";
 
         BuildChannelButtons(ev);
 
@@ -444,23 +488,29 @@ public partial class MainWindow : Window
         ChannelButtonsPanel.Children.Clear();
         _activeChannelBtn = null;
 
+        var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (int i = 0; i < ev.Links.Count; i++)
         {
             var link = ev.Links[i];
+            var name = string.IsNullOrWhiteSpace(link.Name) ? $"Canal {i + 1}" : link.Name.Trim();
+            // Evita botones con nombre identico (antes se distinguian por la fuente)
+            if (seen.TryGetValue(name, out var c)) { seen[name] = c + 1; name = $"{name} {c + 1}"; }
+            else seen[name] = 1;
+
             var btn = new Button
             {
-                Content = string.IsNullOrWhiteSpace(link.Name) ? $"Canal {i + 1}" : link.Name,
+                Content = name,
                 Style = (Style)FindResource("ChannelBtn"),
                 Margin = new Thickness(0, 0, 6, 6),
                 CommandParameter = link.Url,   // URL aqui (Tag se usa para marcar el activo)
-                ToolTip = link.Url
+                ToolTip = "Reproducir " + name
             };
             btn.Click += ChannelButton_Click;
             ChannelButtonsPanel.Children.Add(btn);
         }
 
-        // Se posiciona en el primer canal (lo carga) pero SIN forzar autoplay.
-        // El usuario pulsa play en el reproductor cuando quiera.
+        // Selecciona y reproduce automaticamente el primer canal del evento
+        // (el autoplay real lo dispara OnWebNavigationCompleted / PlayInVlc).
         if (ChannelButtonsPanel.Children.Count > 0 &&
             ChannelButtonsPanel.Children[0] is Button first)
         {
@@ -548,7 +598,7 @@ public partial class MainWindow : Window
             media.AddOption(":http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 SportsMax/1.0");
             media.AddOption(":network-caching=1500");
             _player.Play(media);
-            _player.Volume = (int)VolumeSlider.Value;
+            _player.Volume = 100;
             PlayerStateLabel.Text = "Conectando VLC...";
             PlayerStateLabel.Foreground = (Brush)FindResource("AccentSoft");
             App.Log($"[Play VLC] {url}");
@@ -571,7 +621,12 @@ public partial class MainWindow : Window
             PlayerStateLabel.Text = "Cargando pagina...";
             PlayerStateLabel.Foreground = (Brush)FindResource("AccentSoft");
 
-            WebPlayer.CoreWebView2.Navigate(url);
+            // Hosts cuyo wrapper exige cargarse dentro de un iframe (streamhdx, etc.):
+            // navegar directo devuelve "Usa iframe para cargar este reproductor".
+            if (PlayerEmbed.RequiresIframe(url))
+                WebPlayer.CoreWebView2.NavigateToString(PlayerEmbed.BuildIframeDocument(url));
+            else
+                WebPlayer.CoreWebView2.Navigate(url);
             WebPlayer.CoreWebView2.NavigationCompleted -= OnWebNavigationCompleted;
             WebPlayer.CoreWebView2.NavigationCompleted += OnWebNavigationCompleted;
             await Task.Yield();
@@ -583,11 +638,15 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnWebNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+    private async void OnWebNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
     {
-        // Sin autoplay forzado: la pagina queda lista; el usuario pulsa play si no inicia sola
-        PlayerStateLabel.Text = "Canal cargado · pulsa ▶ si no inicia";
-        PlayerStateLabel.Foreground = (Brush)FindResource("AccentSoft");
+        PlayerStateLabel.Text = "Reproduciendo (navegador)";
+        PlayerStateLabel.Foreground = (Brush)FindResource("OkGreen");
+
+        // Autoplay suave: arranca la reproduccion via API del player (sin clicks).
+        if (WebPlayer.CoreWebView2 == null) return;
+        try { await WebPlayer.CoreWebView2.ExecuteScriptAsync(PlayerEmbed.AutoplayScript); }
+        catch { /* ignore */ }
     }
 
     private void StopAllPlayback()
@@ -625,39 +684,16 @@ public partial class MainWindow : Window
 
     private void EnterFullscreen()
     {
+        if (_isPip) ExitPip();
+
         // Guarda estado original
         _savedWindowStyle = WindowStyle;
         _savedWindowState = WindowState;
         _savedResizeMode = ResizeMode;
-        _savedSidebarWidth = SidebarCol.Width;
-        _savedSplitterWidth = SplitterCol.Width;
-        _savedSidebarMinWidth = SidebarCol.MinWidth;
-        _savedPlayerMinWidth = PlayerCol.MinWidth;
-        _savedMainGridMargin = MainGrid.Margin;
-        _savedPlayerInnerMargin = PlayerInnerDock.Margin;
-        _savedPlayerOuterCorner = PlayerOuterBorder.CornerRadius;
-        _savedVideoSurfaceCorner = VideoSurfaceBorder.CornerRadius;
+        SaveChromeState();
 
-        // Oculta chrome
-        HeaderBorder.Visibility = Visibility.Collapsed;
-        StatusBarBorder.Visibility = Visibility.Collapsed;
-        SidebarBorder.Visibility = Visibility.Collapsed;
-        SplitterCtl.Visibility = Visibility.Collapsed;
-        PlayerHeader.Visibility = Visibility.Collapsed;
-        ChannelBar.Visibility = Visibility.Collapsed;
-        ControlBar.Visibility = Visibility.Collapsed;
-
-        // ZERO de MinWidth y Width para que la sidebar realmente colapse
-        SidebarCol.MinWidth = 0;
-        SidebarCol.Width = new GridLength(0);
-        SplitterCol.Width = new GridLength(0);
-        PlayerCol.MinWidth = 0;
-
-        // Quita margenes y radios para que el video llene la pantalla
-        MainGrid.Margin = new Thickness(0);
-        PlayerInnerDock.Margin = new Thickness(0);
-        PlayerOuterBorder.CornerRadius = new CornerRadius(0);
-        VideoSurfaceBorder.CornerRadius = new CornerRadius(0);
+        // Oculta chrome y deja solo el video
+        CollapsePlayerChrome();
 
         // Muestra la barra de salida en la parte superior (fuera del area de video)
         FsExitBar.Visibility = Visibility.Visible;
@@ -680,6 +716,127 @@ public partial class MainWindow : Window
         ResizeMode = _savedResizeMode;
         WindowState = _savedWindowState;
 
+        RestorePlayerChrome();
+        FsExitBar.Visibility = Visibility.Collapsed;
+
+        _isFullscreen = false;
+    }
+
+    // =================== MODO VENTANA FLOTANTE (PiP) ===================
+    // Misma tecnica que el fullscreen (reconfigurar ESTA ventana, sin tocar el
+    // reproductor) pero encogiendola a una mini-ventana topmost en la esquina. Como
+    // el WebView2/VLC nunca se recrea, la reproduccion continua sin reiniciarse.
+
+    private void EnterPip()
+    {
+        if (_isFullscreen) ExitFullscreen();
+        if (_isPip) return;
+
+        _savedPipWindowStyle = WindowStyle;
+        _savedPipWindowState = WindowState;
+        _savedPipResizeMode = ResizeMode;
+        _savedPipTopmost = Topmost;
+        _savedPipMinWidth = MinWidth;
+        _savedPipMinHeight = MinHeight;
+        // RestoreBounds da posicion/tamano correctos aunque la ventana este maximizada.
+        var bounds = (WindowState == WindowState.Normal)
+            ? new Rect(Left, Top, Width, Height)
+            : RestoreBounds;
+        _savedPipLeft = bounds.Left;
+        _savedPipTop = bounds.Top;
+        _savedPipWidth = bounds.Width;
+        _savedPipHeight = bounds.Height;
+
+        SaveChromeState();
+        CollapsePlayerChrome();
+        PipBar.Visibility = Visibility.Visible;
+
+        // La ventana principal tiene MinWidth/MinHeight grandes: hay que bajarlos
+        // para poder encogerla al tamano de un PiP.
+        WindowState = WindowState.Normal;
+        WindowStyle = WindowStyle.None;
+        ResizeMode = ResizeMode.CanResize;
+        MinWidth = 240;
+        MinHeight = 150;
+        Topmost = true;
+
+        // Alto = video 16:9 (270) + la franja de la barra flotante (~30)
+        const double w = 480, h = 300;
+        var area = SystemParameters.WorkArea;
+        Width = w;
+        Height = h;
+        Left = area.Right - w - 20;
+        Top = area.Bottom - h - 20;
+
+        _isPip = true;
+        StartPipAutoHide();
+    }
+
+    private void ExitPip()
+    {
+        if (!_isPip) return;
+
+        StopPipAutoHide();
+        PipBar.Visibility = Visibility.Collapsed;
+        RestorePlayerChrome();
+
+        MinWidth = _savedPipMinWidth;
+        MinHeight = _savedPipMinHeight;
+        WindowStyle = _savedPipWindowStyle;
+        ResizeMode = _savedPipResizeMode;
+        Topmost = _savedPipTopmost;
+
+        WindowState = _savedPipWindowState;
+        if (_savedPipWindowState == WindowState.Normal)
+        {
+            Left = _savedPipLeft;
+            Top = _savedPipTop;
+            Width = _savedPipWidth;
+            Height = _savedPipHeight;
+        }
+
+        _isPip = false;
+    }
+
+    // -- Helpers de chrome compartidos por fullscreen y PiP --
+
+    private void SaveChromeState()
+    {
+        _savedSidebarWidth = SidebarCol.Width;
+        _savedSplitterWidth = SplitterCol.Width;
+        _savedSidebarMinWidth = SidebarCol.MinWidth;
+        _savedPlayerMinWidth = PlayerCol.MinWidth;
+        _savedMainGridMargin = MainGrid.Margin;
+        _savedPlayerInnerMargin = PlayerInnerDock.Margin;
+        _savedPlayerOuterCorner = PlayerOuterBorder.CornerRadius;
+        _savedVideoSurfaceCorner = VideoSurfaceBorder.CornerRadius;
+    }
+
+    private void CollapsePlayerChrome()
+    {
+        HeaderBorder.Visibility = Visibility.Collapsed;
+        StatusBarBorder.Visibility = Visibility.Collapsed;
+        SidebarBorder.Visibility = Visibility.Collapsed;
+        SplitterCtl.Visibility = Visibility.Collapsed;
+        PlayerHeader.Visibility = Visibility.Collapsed;
+        ChannelBar.Visibility = Visibility.Collapsed;
+        ControlBar.Visibility = Visibility.Collapsed;
+
+        // ZERO de MinWidth y Width para que la sidebar realmente colapse
+        SidebarCol.MinWidth = 0;
+        SidebarCol.Width = new GridLength(0);
+        SplitterCol.Width = new GridLength(0);
+        PlayerCol.MinWidth = 0;
+
+        // Quita margenes y radios para que el video llene la superficie
+        MainGrid.Margin = new Thickness(0);
+        PlayerInnerDock.Margin = new Thickness(0);
+        PlayerOuterBorder.CornerRadius = new CornerRadius(0);
+        VideoSurfaceBorder.CornerRadius = new CornerRadius(0);
+    }
+
+    private void RestorePlayerChrome()
+    {
         HeaderBorder.Visibility = Visibility.Visible;
         StatusBarBorder.Visibility = Visibility.Visible;
         SidebarBorder.Visibility = Visibility.Visible;
@@ -687,7 +844,6 @@ public partial class MainWindow : Window
         PlayerHeader.Visibility = Visibility.Visible;
         ChannelBar.Visibility = Visibility.Visible;
         ControlBar.Visibility = Visibility.Visible;
-        FsExitBar.Visibility = Visibility.Collapsed;
 
         SidebarCol.MinWidth = _savedSidebarMinWidth;
         SidebarCol.Width = _savedSidebarWidth;
@@ -698,13 +854,16 @@ public partial class MainWindow : Window
         PlayerInnerDock.Margin = _savedPlayerInnerMargin;
         PlayerOuterBorder.CornerRadius = _savedPlayerOuterCorner;
         VideoSurfaceBorder.CornerRadius = _savedVideoSurfaceCorner;
-
-        _isFullscreen = false;
     }
 
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Escape && _isFullscreen)
+        if (e.Key == Key.Escape && _isPip)
+        {
+            ExitPip();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && _isFullscreen)
         {
             ExitFullscreen();
             e.Handled = true;
@@ -769,72 +928,97 @@ public partial class MainWindow : Window
         Mouse.OverrideCursor = Cursors.None;
     }
 
+    // -- Auto-hide de la barra del modo flotante --
+    // El video es airspace (WebView2/VLC) y no entrega MouseMove a WPF, asi que
+    // detectamos el movimiento del cursor con GetCursorPos, igual que en fullscreen.
+    // A diferencia del fullscreen, NO ocultamos el cursor (molestaria en una ventana
+    // pequena) ni cubrimos toda la pantalla: solo reaccionamos dentro de la ventana.
+
+    private void StartPipAutoHide()
+    {
+        GetCursorPos(out _lastPipCursor);
+        PipBar.Visibility = Visibility.Visible;
+        _pipPollTimer.Tick -= PipPoll_Tick;
+        _pipHideTimer.Tick -= PipHide_Tick;
+        _pipPollTimer.Tick += PipPoll_Tick;
+        _pipHideTimer.Tick += PipHide_Tick;
+        _pipPollTimer.Start();
+        _pipHideTimer.Stop();
+        _pipHideTimer.Start();
+    }
+
+    private void StopPipAutoHide()
+    {
+        _pipPollTimer.Stop();
+        _pipHideTimer.Stop();
+        _pipPollTimer.Tick -= PipPoll_Tick;
+        _pipHideTimer.Tick -= PipHide_Tick;
+    }
+
+    private void PipPoll_Tick(object? sender, EventArgs e)
+    {
+        if (!GetCursorPos(out var p)) return;
+        if (p.X == _lastPipCursor.X && p.Y == _lastPipCursor.Y) return;
+        _lastPipCursor = p;
+        // Solo mostrar la barra si el cursor esta sobre la ventana flotante
+        if (!IsCursorInsidePipWindow(p)) return;
+        if (PipBar.Visibility != Visibility.Visible)
+            PipBar.Visibility = Visibility.Visible;
+        _pipHideTimer.Stop();
+        _pipHideTimer.Start();
+    }
+
+    private void PipHide_Tick(object? sender, EventArgs e)
+    {
+        _pipHideTimer.Stop();
+        // Si el mouse esta sobre la propia barra, no la ocultes
+        if (PipBar.IsMouseOver)
+        {
+            _pipHideTimer.Start();
+            return;
+        }
+        PipBar.Visibility = Visibility.Collapsed;
+    }
+
+    private bool IsCursorInsidePipWindow(POINT p)
+    {
+        try
+        {
+            // PointToScreen convierte DIPs a pixeles fisicos (correcto en cualquier DPI)
+            var tl = PointToScreen(new Point(0, 0));
+            var br = PointToScreen(new Point(ActualWidth, ActualHeight));
+            return p.X >= tl.X && p.X < br.X && p.Y >= tl.Y && p.Y < br.Y;
+        }
+        catch { return true; }
+    }
+
     // =================== PiP ===================
 
     private void PipBtn_Click(object sender, RoutedEventArgs e)
     {
-        var url = _lastPlayedUrl
-            ?? _activeChannelBtn?.CommandParameter as string;
-        if (string.IsNullOrWhiteSpace(url))
+        if (_isPip) ExitPip();
+        else EnterPip();
+    }
+
+    // Arrastre de la mini-ventana desde el asa de la barra flotante.
+    private void PipBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton == MouseButton.Left)
         {
-            MessageBox.Show("Selecciona un evento primero.", "SportsMax",
-                MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
+            try { DragMove(); } catch { /* ignore */ }
         }
+    }
 
-        if (_pip != null)
-        {
-            _pip.Activate();
-            return;
-        }
+    private void PipRestore_Click(object sender, RoutedEventArgs e) => ExitPip();
 
-        var useWeb = _engine switch
-        {
-            Engine.Web => true,
-            Engine.Vlc => false,
-            _ => IsWrapperPage(url)
-        };
-
+    private void PipStop_Click(object sender, RoutedEventArgs e)
+    {
+        ExitPip();
         StopAllPlayback();
-        PlayerStateLabel.Text = "Reproduciendo en ventana flotante";
-        PlayerStateLabel.Foreground = (Brush)FindResource("AccentSoft");
-
-        _pip = new PipWindow(url, _currentEvent?.Title ?? "", useWeb);
-        _pip.Closed += (_, __) =>
-        {
-            _pip = null;
-            PlayerStateLabel.Text = "Detenido";
-            PlayerStateLabel.Foreground = (Brush)FindResource("FgMuted");
-        };
-        _pip.ReturnRequested += retUrl =>
-        {
-            PlayUrl(retUrl);
-        };
-        _pip.Show();
-    }
-
-    // =================== VOLUMEN / MUTE ===================
-
-    private void VolumeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        if (_player != null) _player.Volume = (int)e.NewValue;
-        if (!_isMuted) _lastVolume = (int)e.NewValue;
-        MuteIcon.Text = (int)e.NewValue == 0 || _isMuted ? "🔇" : "🔊";
-    }
-
-    private void MuteIcon_Click(object sender, MouseButtonEventArgs e)
-    {
-        _isMuted = !_isMuted;
-        if (_isMuted)
-        {
-            _lastVolume = (int)VolumeSlider.Value;
-            VolumeSlider.Value = 0;
-            MuteIcon.Text = "🔇";
-        }
-        else
-        {
-            VolumeSlider.Value = _lastVolume == 0 ? 80 : _lastVolume;
-            MuteIcon.Text = "🔊";
-        }
+        PlayerStateLabel.Text = "Detenido";
+        PlayerStateLabel.Foreground = (Brush)FindResource("FgMuted");
+        VideoView.Visibility = Visibility.Visible;
+        WebPlayer.Visibility = Visibility.Collapsed;
+        PosterImage.Visibility = Visibility.Visible;
     }
 }

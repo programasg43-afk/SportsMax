@@ -47,6 +47,7 @@ public static class AdBlocker
         "luckyads.pro", "ero-advertising.com",
         "tsyndicate.com", "adservme.com", "videovard.com",
         "popsoul.com", "popmonster.cc",
+        "effectivecpmnetwork.com", "effectivegatecpm.com",
 
         // RTB / exchanges
         "adnxs.com", "amazon-adsystem.com", "rubiconproject.com",
@@ -96,6 +97,9 @@ public static class AdBlocker
         return origAdd.apply(this, arguments);
       };
     } catch(e){}
+
+    // El control de volumen lo gestiona el propio reproductor (Clappr/JW/video
+    // nativo). No inyectamos ningun forzado de volumen para no competir con el.
 
     // ============== OCULTAR ADS ==============
     function hideAds(){

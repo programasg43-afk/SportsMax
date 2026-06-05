@@ -58,7 +58,15 @@ public partial class PipWindow : Window
 
                 await AdBlocker.ApplyAsync(WebPlayer);
 
-                WebPlayer.CoreWebView2.Navigate(_url);
+                // Autoplay suave SOLO en el PiP: el flotante debe continuar lo que
+                // ya estabas viendo. Sin clicks sinteticos (esos causaban el toggle
+                // play/pause que rompia la carga); solo APIs de player + video.play().
+                WebPlayer.CoreWebView2.NavigationCompleted += PipNavCompleted;
+                // Wrappers que solo sirven el player dentro de un iframe (streamhdx, etc.)
+                if (PlayerEmbed.RequiresIframe(_url))
+                    WebPlayer.CoreWebView2.NavigateToString(PlayerEmbed.BuildIframeDocument(_url));
+                else
+                    WebPlayer.CoreWebView2.Navigate(_url);
             }
             catch (Exception ex)
             {
@@ -88,6 +96,14 @@ public partial class PipWindow : Window
         }
 
         StartAutoHide();
+    }
+
+    private async void PipNavCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+    {
+        // Autoplay compartido con el reproductor principal (via API del player, sin
+        // clicks; recorre iframes para alcanzar el wrapper incrustado de streamhdx).
+        try { await WebPlayer.CoreWebView2.ExecuteScriptAsync(PlayerEmbed.AutoplayScript); }
+        catch { /* ignore */ }
     }
 
     // -- Auto-hide --

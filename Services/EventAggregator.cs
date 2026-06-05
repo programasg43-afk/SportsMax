@@ -32,6 +32,9 @@ public class EventAggregator
             new StreamTpSource("StreamTP", Obfuscator.Decode("OwREAgdJYhsLTkgDBAgQSlQTRhRZXV0dUyUVXgYbAGNeC1VU")),
             // tvtvhd publica un agenda123.json con el mismo formato que la14hd
             new La14HdSource("TVTVHD",     Obfuscator.Decode("OwREAgdJYhsMTE4QDQFKWVUbHl9MV15GWSBfWgEbHWJVH19UAgRUVgkUHEJVVA==")),
+            // streamhdx: feed anidado {dias:[{eventos:[{canales}]}]}; el player
+            // (live1.php) exige cargarse en iframe -> ver PlayerEmbed/StreamHdxSource
+            new StreamHdxSource("StreamHDX", Obfuscator.Decode("OwREAgdJYhsLTkgDBAgMXkJYUlVXHVVEUz0EXwFaGT5bFg==")),
         };
     }
 
@@ -83,7 +86,7 @@ public class EventAggregator
                 {
                     existing.Links.Add(new StreamLink
                     {
-                        Name = $"{link.Name} ({ev.Source})",
+                        Name = link.Name,
                         Url = link.Url
                     });
                 }
