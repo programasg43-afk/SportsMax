@@ -8,6 +8,10 @@
 ;    2) (Opcional) Colocar el bootstrapper de WebView2 en installer\redist\
 ;         MicrosoftEdgeWebview2Setup.exe  (https://go.microsoft.com/fwlink/p/?LinkId=2124703)
 ;    3) Compilar este script con Inno Setup (ISCC.exe SportsMax.iss)
+;    4) Forzar elevacion automatica (UAC al doble clic):
+;         pwsh installer\set-admin-manifest.ps1 installer\Output\SportsMax-Setup-1.1.0.exe
+;       (Inno deja el manifiesto como "asInvoker"; el script lo cambia a
+;        "requireAdministrator" sin alterar el tamano del .exe.)
 ;
 ;  El instalador resultante queda en  installer\Output\
 ; ============================================================================
